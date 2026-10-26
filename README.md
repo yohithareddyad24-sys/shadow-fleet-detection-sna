@@ -172,7 +172,6 @@ def run_aco_path(source: str, destination: str):
 ---
 
 ---
----
 
 ## 6. Backend Service & Live Data Processing Subsystem
 
@@ -190,10 +189,16 @@ The backend subsystem provides automated data ingestion, persistent storage, and
 
 ## 7. Running the Platform (3 Terminals)
 
-Run each command from the root of the repository:
+Ensure you are inside the repository folder and your virtual environment is active in each terminal window before running:
 
 ### Terminal 1: FastAPI Backend Service
 ```bash
+# Mac / Linux:
+source .venv/bin/activate
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+
+# Windows:
+.venv\Scripts\activate
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 * **Interactive Swagger UI:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
@@ -201,11 +206,23 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 
 ### Terminal 2: Satellite AIS Ingestion Worker
 ```bash
+# Mac / Linux:
+source .venv/bin/activate
+python -m app.pipeline.ingest
+
+# Windows:
+.venv\Scripts\activate
 python -m app.pipeline.ingest
 ```
 
 ### Terminal 3: Periodic Automated Analysis Job
 ```bash
+# Mac / Linux:
+source .venv/bin/activate
+python -m app.pipeline.analyze --loop
+
+# Windows:
+.venv\Scripts\activate
 python -m app.pipeline.analyze --loop
 ```
 
@@ -236,6 +253,12 @@ All endpoints return JSON and have CORS enabled for frontend clients (`localhost
 Run all 28 unit and integration tests across backend, data pipeline, and analytics:
 
 ```bash
+# Mac / Linux:
+source .venv/bin/activate
+pytest tests/ -v
+
+# Windows:
+.venv\Scripts\activate
 pytest tests/ -v
 ```
 
