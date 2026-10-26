@@ -1,0 +1,523 @@
+/**
+ * GRAPHICS & VISUAL EFFECTS LAYER - Shadow Fleet AI Console
+ * Centralized visual effects, tactical HUD aesthetics, micro-animations,
+ * and performance-budgeted styling for maritime intelligence operations.
+ */
+
+/* ==========================================================================
+   1. GLOBAL ATMOSPHERE & SURFACES
+   ========================================================================== */
+
+/* Nautical Grid Background with Top-Left Cyan Glow */
+.nautical-grid-bg {
+  background-color: #070B14;
+  background-image: 
+    radial-gradient(circle at 10% 8%, rgba(32, 213, 232, 0.08) 0%, transparent 42%),
+    linear-gradient(to right, rgba(36, 50, 73, 0.22) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(36, 50, 73, 0.22) 1px, transparent 1px);
+  background-size: 100% 100%, 48px 48px, 48px 48px;
+}
+
+/* Glass Panels for Elevated Surfaces (popups, side panels, filter bars, modals) */
+.glass-panel {
+  background: rgba(22, 35, 56, 0.72) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(36, 50, 73, 0.9) !important;
+  box-shadow: inset 0 1px 0 0 rgba(32, 213, 232, 0.16), 0 8px 32px 0 rgba(0, 0, 0, 0.5) !important;
+}
+
+.glass-panel-subtle {
+  background: rgba(17, 27, 45, 0.65) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(36, 50, 73, 0.75) !important;
+  box-shadow: inset 0 1px 0 0 rgba(32, 213, 232, 0.1), 0 4px 20px 0 rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Interactive Card Styles with Brightening Border & Soft Glow */
+.tactical-card {
+  border: 1px solid #243249;
+  background-color: #111B2D;
+  transition: border-color 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s ease;
+}
+
+.tactical-card:hover {
+  border-color: rgba(32, 213, 232, 0.55);
+  box-shadow: 0 0 16px rgba(32, 213, 232, 0.14);
+}
+
+/* Cursor-Following Radial Highlight for KPI Cards */
+.kpi-radial-highlight {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #243249;
+  background-color: #111B2D;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.kpi-radial-highlight::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    400px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    rgba(32, 213, 232, 0.12),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 1;
+}
+
+.kpi-radial-highlight:hover {
+  border-color: rgba(32, 213, 232, 0.5);
+  box-shadow: 0 0 16px rgba(32, 213, 232, 0.15);
+}
+
+.kpi-radial-highlight:hover::before {
+  opacity: 1;
+}
+
+/* Corner Bracket Tick Marks (HUD Brackets) */
+.hud-brackets {
+  position: relative;
+}
+
+.hud-brackets::before,
+.hud-brackets::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  pointer-events: none;
+  z-index: 10;
+  border-color: rgba(32, 213, 232, 0.65);
+}
+
+.hud-brackets::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid rgba(32, 213, 232, 0.7);
+  border-left: 2px solid rgba(32, 213, 232, 0.7);
+}
+
+.hud-brackets::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid rgba(32, 213, 232, 0.7);
+  border-right: 2px solid rgba(32, 213, 232, 0.7);
+}
+
+/* Complete 4-Corner HUD Brackets Component */
+.hud-corner-frame {
+  position: relative;
+}
+
+.hud-corner-tick {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  pointer-events: none;
+  z-index: 15;
+}
+
+.hud-corner-tl {
+  top: -1px;
+  left: -1px;
+  border-top: 1.5px solid #20D5E8;
+  border-left: 1.5px solid #20D5E8;
+}
+
+.hud-corner-tr {
+  top: -1px;
+  right: -1px;
+  border-top: 1.5px solid #20D5E8;
+  border-right: 1.5px solid #20D5E8;
+}
+
+.hud-corner-bl {
+  bottom: -1px;
+  left: -1px;
+  border-bottom: 1.5px solid #20D5E8;
+  border-left: 1.5px solid #20D5E8;
+}
+
+.hud-corner-br {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 1.5px solid #20D5E8;
+  border-right: 1.5px solid #20D5E8;
+}
+
+/* ==========================================================================
+   2. MOTION & TRANSITIONS
+   ========================================================================== */
+
+/* Page View Transitions: 220ms fade + 8px upward slide */
+@keyframes page-enter-up {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-transition-enter {
+  animation: page-enter-up 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* Staggered Card Entrances (40ms steps, max 8 items) */
+@keyframes stagger-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stagger-item-1 { animation: stagger-fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1) 0ms both; }
+.stagger-item-2 { animation: stagger-fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1) 40ms both; }
+.stagger-item-3 { animation: stagger-fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both; }
+.stagger-item-4 { animation: stagger-fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1) 120ms both; }
+.stagger-item-5 { animation: stagger-fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1) 160ms both; }
+.stagger-item-6 { animation: stagger-fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1) 200ms both; }
+.stagger-item-7 { animation: stagger-fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1) 240ms both; }
+.stagger-item-8 { animation: stagger-fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1) 280ms both; }
+
+/* Thin Animated Top Progress Bar */
+@keyframes progress-shimmer {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(0%); }
+  100% { transform: translateX(100%); }
+}
+
+.top-progress-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2.5px;
+  background: linear-gradient(90deg, #20D5E8, #4285F4, #20D5E8);
+  box-shadow: 0 0 10px rgba(32, 213, 232, 0.7);
+  animation: progress-shimmer 1.8s ease-in-out infinite;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+/* Skeleton Shimmer Sweep (Replaces Spinners for Tables, Cards, Charts) */
+@keyframes shimmer-sweep {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(22, 35, 56, 0.5) 0%,
+    rgba(36, 50, 73, 0.75) 50%,
+    rgba(22, 35, 56, 0.5) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-sweep 1.8s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+/* Sidebar & Navigation Sliding Glowing Bar */
+.nav-active-glow {
+  position: relative;
+}
+
+.nav-active-glow::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  background: #20D5E8;
+  border-radius: 2px;
+  box-shadow: 0 0 10px rgba(32, 213, 232, 0.8), 0 0 20px rgba(32, 213, 232, 0.4);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Status Dots Soft Breathing Pulse */
+@keyframes breathing-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.95;
+    box-shadow: 0 0 0 0 currentColor;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.65;
+    box-shadow: 0 0 6px 2px currentColor;
+  }
+}
+
+.status-dot-live {
+  color: rgba(57, 217, 138, 0.8);
+  background-color: #39D98A;
+  animation: breathing-pulse 2.4s ease-in-out infinite;
+}
+
+.status-dot-stale {
+  color: rgba(245, 185, 66, 0.8);
+  background-color: #F5B942;
+  animation: breathing-pulse 3s ease-in-out infinite;
+}
+
+.status-dot-down {
+  color: rgba(255, 92, 101, 0.85);
+  background-color: #FF5C65;
+  animation: breathing-pulse 1.8s ease-in-out infinite;
+}
+
+.status-dot-demo {
+  color: rgba(100, 116, 139, 0.5);
+  background-color: #64748B;
+}
+
+/* One-Time Attention Pulse for newly arrived high-priority rows */
+@keyframes attention-pulse-once {
+  0% {
+    background-color: rgba(255, 92, 101, 0.35);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.row-attention-pulse {
+  animation: attention-pulse-once 1.4s ease-out 1 forwards;
+}
+
+/* ==========================================================================
+   3. MAP EFFECTS (LEAFLET)
+   ========================================================================== */
+
+/* Rotating Radar Sweep Conic Gradient */
+@keyframes radar-conic-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.radar-sweep-cone {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    rgba(32, 213, 232, 0.22) 0deg,
+    rgba(32, 213, 232, 0.05) 45deg,
+    transparent 60deg,
+    transparent 360deg
+  );
+  animation: radar-conic-spin 5.5s linear infinite;
+  pointer-events: none;
+}
+
+/* Expanding Pulse Ring for High-Priority & Elevated Vessels */
+@keyframes expanding-pulse-ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  75% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+.vessel-pulse-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  animation: expanding-pulse-ring 2.6s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  pointer-events: none;
+}
+
+/* Bright Cyan Halo for Selected Vessel */
+.vessel-selected-halo {
+  box-shadow: 0 0 0 3px #20D5E8, 0 0 16px rgba(32, 213, 232, 0.85) !important;
+}
+
+/* Comet Trail Animation for Trajectory Polylines */
+@keyframes comet-dash {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+
+.trajectory-comet-path {
+  stroke-dasharray: 8 16;
+  animation: comet-dash 2s linear infinite;
+  filter: drop-shadow(0 0 4px #20D5E8);
+}
+
+/* AIS Signal Lost Flickering & Ripple */
+@keyframes gap-flicker {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 0.3; }
+}
+
+.ais-gap-flicker {
+  animation: gap-flicker 1.6s ease-in-out infinite;
+}
+
+@keyframes signal-lost-ripple {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.signal-lost-ripple-fx {
+  animation: signal-lost-ripple 2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+}
+
+/* STS Encounter Midpoint Pulse */
+@keyframes sts-midpoint-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 8px rgba(245, 185, 66, 0.6);
+  }
+  50% {
+    transform: scale(1.3);
+    box-shadow: 0 0 16px rgba(245, 185, 66, 0.9);
+  }
+}
+
+.sts-midpoint-indicator {
+  animation: sts-midpoint-pulse 2s ease-in-out infinite;
+}
+
+/* ==========================================================================
+   4. EVIDENCE CATEGORY VISUALS (PROFILE PAGE)
+   ========================================================================== */
+
+/* Block 1: Observed Facts */
+.evidence-block-observed {
+  border: 1px solid rgba(57, 217, 138, 0.35);
+  background: rgba(57, 217, 138, 0.05);
+}
+
+/* Block 2: Algorithmic Inferences */
+.evidence-block-inferred {
+  border: 1px solid rgba(66, 133, 244, 0.35);
+  background: rgba(66, 133, 244, 0.05);
+}
+
+/* Block 3: Unverified Information */
+.evidence-block-unverified {
+  border: 1px dashed rgba(245, 185, 66, 0.5);
+  background: rgba(245, 185, 66, 0.04);
+}
+
+/* ==========================================================================
+   5. NETWORK GRAPH EFFECTS (CYTOSCAPE)
+   ========================================================================== */
+
+/* Canvas faint grid background */
+.network-canvas-container {
+  background-color: #070B14;
+  background-image: 
+    linear-gradient(to right, rgba(36, 50, 73, 0.18) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(36, 50, 73, 0.18) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* ==========================================================================
+   6. PERFORMANCE BUDGET & REDUCED EFFECTS MODE
+   ========================================================================== */
+
+/* Reduced effects user preference via toggle */
+body.reduce-effects *,
+body.reduce-effects *::before,
+body.reduce-effects *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+body.reduce-effects .radar-sweep-cone,
+body.reduce-effects .vessel-pulse-ring,
+body.reduce-effects .top-progress-bar,
+body.reduce-effects .skeleton-shimmer,
+body.reduce-effects .trajectory-comet-path,
+body.reduce-effects .ais-gap-flicker,
+body.reduce-effects .signal-lost-ripple-fx,
+body.reduce-effects .sts-midpoint-indicator,
+body.reduce-effects .status-dot-live,
+body.reduce-effects .status-dot-stale,
+body.reduce-effects .status-dot-down,
+body.reduce-effects .row-attention-pulse,
+body.reduce-effects .page-transition-enter {
+  animation: none !important;
+}
+
+body.reduce-effects .kpi-radial-highlight::before {
+  display: none !important;
+}
+
+/* OS prefers-reduced-motion media query */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .radar-sweep-cone,
+  .vessel-pulse-ring,
+  .top-progress-bar,
+  .skeleton-shimmer,
+  .trajectory-comet-path,
+  .ais-gap-flicker,
+  .signal-lost-ripple-fx,
+  .sts-midpoint-indicator,
+  .status-dot-live,
+  .status-dot-stale,
+  .status-dot-down,
+  .row-attention-pulse,
+  .page-transition-enter {
+    animation: none !important;
+  }
+
+  .kpi-radial-highlight::before {
+    display: none !important;
+  }
+}
+

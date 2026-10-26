@@ -1,0 +1,90 @@
+@import './styles/tokens.css';
+@import './styles/effects.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-ui);
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  user-select: none;
+}
+
+#root {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-width: 100%;
+  margin: 0;
+  border: none;
+}
+
+/* Custom Tactical Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-sidebar);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: var(--radius-sm);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent-cyan);
+}
+
+/* Leaflet Dark Customizations */
+.leaflet-container {
+  background: var(--color-bg) !important;
+  font-family: var(--font-ui) !important;
+  width: 100%;
+  height: 100%;
+}
+.leaflet-popup-content-wrapper {
+  background: rgba(22, 35, 56, 0.85) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  color: var(--color-text-primary) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-panel) !important;
+  padding: 4px !important;
+}
+.leaflet-popup-tip {
+  background: var(--color-card) !important;
+  border: 1px solid var(--color-border) !important;
+}
+.leaflet-popup-content {
+  margin: 8px 12px !important;
+  line-height: 1.4 !important;
+}
+.leaflet-bar a {
+  background-color: var(--color-card) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-accent-cyan) !important;
+}
+.leaflet-bar a:hover {
+  background-color: var(--color-elevated) !important;
+  color: #ffffff !important;
+}
+
+/* Tabular number display */
+.font-mono-numbers {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
