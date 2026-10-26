@@ -167,3 +167,54 @@ def run_aco_path(source: str, destination: str):
     result = aco.find_optimal_path(source, destination)
     return result.to_dict()  # Includes disclaimer and hops
 ```
+
+
+---
+
+## 6. Backend Service & Live Data Processing Subsystem
+
+The backend subsystem provides automated data ingestion, persistent storage, and REST APIs for the frontend user interface.
+
+### A. Subsystem Architecture
+1. **Ingestion Worker (`app/pipeline/ingest.py`):** Connects to the satellite AIS WebSocket stream (`aisstream.io`), sanitizes records with `app/pipeline/validate.py`, and executes batch upserts into SQLite.
+2. **Analysis Engine (`app/pipeline/analyze.py`):** Runs periodically in the background:
+   - Identifies **Dark AIS Gaps** (> 60 minutes silence).
+   - Detects **Ship-to-Ship (STS) Rendezvous** events (< 0.5 NM at < 3.0 knots for > 30 minutes).
+   - Connects to the NetworkX graph builder and computes risk scores.
+3. **Database Layer (`app/db.py`):** SQLite database (`shadowfleet.db`) with `vessels`, `positions`, `interactions`, and `risk_results` tables.
+
+### B. Running the System in 3 Terminals
+
+#### Terminal 1: FastAPI Backend Service
+```bash
+uvicorn app.main:app --reload
+```
+* **Swagger UI:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+* **ReDoc:** [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
+
+#### Terminal 2: Satellite AIS Ingestion Worker
+```bash
+python -m app.pipeline.ingest
+```
+
+#### Terminal 3: Periodic Automated Analysis Job
+```bash
+python -m app.pipeline.analyze --loop
+```
+
+### C. REST Endpoints Reference (Frontend Contract)
+
+All endpoints return JSON and have CORS enabled for frontend clients (`localhost:3000` / `localhost:5173`):
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/health` | Health check & database connection status |
+| `GET` | `/api/vessels?search=` | Search vessels by MMSI or vessel name |
+| `GET` | `/api/vessels/live` | Latest GPS position of all vessels for map markers |
+| `GET` | `/api/vessels/{mmsi}` | Deep profile, risk breakdown, and connected peers |
+| `GET` | `/api/vessels/{mmsi}/trajectory?hours=24` | Historical GPS track points for map polylines |
+| `GET` | `/api/risk/ranking?top=20` | Top ranked vessels by composite risk score |
+| `GET` | `/api/network/graph` | Attributed nodes and edges for network visualizer |
+| `GET` | `/api/network/communities` | Disjoint network clusters / communities |
+| `POST` | `/api/aco/path` | Ant Colony Optimization multi-hop pathfinder |
+| `GET` | `/api/status/ingestion` | Real-time ingestion stream heartbeat |
