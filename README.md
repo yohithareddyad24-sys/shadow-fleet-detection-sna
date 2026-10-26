@@ -171,13 +171,9 @@ def run_aco_path(source: str, destination: str):
 
 ---
 
-
 ---
-
 ## 6. Backend Service & Live Data Processing Subsystem
-
 The backend subsystem provides automated data ingestion, persistent storage, and REST APIs for the frontend user interface.
-
 ### A. Subsystem Architecture
 1. **Ingestion Worker (`app/pipeline/ingest.py`):** Connects to the satellite AIS WebSocket stream (`wss://stream.aisstream.io/v0/stream`), parses `PositionReport` and `ShipStaticData` messages, validates coordinate boundaries and speeds via `app/pipeline/validate.py`, and executes batch upserts into SQLite. Includes local simulation mode for offline testing.
 2. **Analysis Engine (`app/pipeline/analyze.py`):** Runs periodically (every 5 minutes) in the background:
@@ -185,36 +181,29 @@ The backend subsystem provides automated data ingestion, persistent storage, and
    - Detects **Ship-to-Ship (STS) Rendezvous** events using spatial-temporal grid indexing (vessels within 0.5 NM drifting < 3 knots for > 30 minutes).
    - Feeds events into the NetworkX graph builder and executes composite risk scoring.
 3. **Database Layer (`app/db.py`):** SQLite database (`shadowfleet.db`) with tables: `vessels`, `positions` (indexed on MMSI and timestamp), `interactions`, and `risk_results`.
-
 ---
-
 ## 7. Running the Platform (3 Terminals)
-
 Operate the entire platform using three terminal windows:
-
 ### Terminal 1: FastAPI Backend Service
 ```bash
+source .venv/bin/activate
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 * **Interactive Swagger UI:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 * **ReDoc Documentation:** [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
-
 ### Terminal 2: Satellite AIS Ingestion Worker
 ```bash
+source .venv/bin/activate
 python -m app.pipeline.ingest
 ```
-
 ### Terminal 3: Periodic Automated Analysis Job
 ```bash
+source .venv/bin/activate
 python -m app.pipeline.analyze --loop
 ```
-
 ---
-
 ## 8. REST API Reference (Frontend Contract)
-
 All endpoints return JSON and have CORS enabled for frontend clients (`localhost:3000` / `localhost:5173`):
-
 | Method | Endpoint | Description | Query / Body Parameters |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/health` | Health check & database connection status | None |
@@ -227,18 +216,14 @@ All endpoints return JSON and have CORS enabled for frontend clients (`localhost
 | `GET` | `/api/network/communities` | Disjoint network clusters / communities | None |
 | `POST` | `/api/aco/path` | Ant Colony Optimization multi-hop pathfinder | `{"source_mmsi": "...", "destination_mmsi": "..."}` |
 | `GET` | `/api/status/ingestion` | Real-time ingestion stream heartbeat & message count | None |
-
 ---
-
 ## 9. Automated Testing & Continuous Integration
-
 ### Test Suite Execution
 Run all 28 unit and integration tests across backend, data pipeline, and analytics:
-
 ```bash
+source .venv/bin/activate
 pytest tests/ -v
 ```
-
 **Test Results:**
 * `tests/test_graph_builder.py`: 5 passed
 * `tests/test_sna_metrics.py`: 4 passed
@@ -248,6 +233,5 @@ pytest tests/ -v
 * `tests/test_api.py`: 6 passed
 * `tests/test_pipeline.py`: 1 passed
 * **Total:** **28 passed in 0.59s (100% green)**
-
 ### GitHub Actions CI
 Automated testing is configured in `.github/workflows/ci.yml`. Every push and pull request to `main` automatically sets up Python 3.11, initializes the database, and executes the full test suite.
