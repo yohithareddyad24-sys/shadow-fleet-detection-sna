@@ -1,0 +1,16 @@
+# Secrets and Virtual Environments
+.venv/
+.env
+
+# Database and Cache
+*.db
+*.sqlite3
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# System Junk
+.DS_Store
+
+# Stream recordings
+data/raw/
