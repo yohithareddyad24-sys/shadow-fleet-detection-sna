@@ -1,205 +1,110 @@
-import React, { useState, useEffect } from 'react';
-import Header from './components/Header';
-import Navigation from './components/Navigation';
-import DisclaimerBanner from './components/DisclaimerBanner';
-import VesselDossierModal from './components/VesselDossierModal';
+import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useOutletContext, useParams } from 'react-router-dom';
+import AppLayout from './components/layout/AppLayout';
 
+import OverviewView from './views/OverviewView';
 import GeospatialView from './views/GeospatialView';
 import FleetTableView from './views/FleetTableView';
-import NetworkView from './views/NetworkView';
-import AcoWorkbench from './views/AcoWorkbench';
 import AnalyticsView from './views/AnalyticsView';
+import NetworkAnalysisView from './views/NetworkAnalysisView';
 import InvestigationsView from './views/InvestigationsView';
+import MethodologyView from './views/MethodologyView';
 
-import { fetchVessels, checkBackendHealth, fetchMetricsSummary } from './services/api';
+// Route wrappers to bind Outlet context cleanly
+function OverviewRoute() {
+  const ctx = useOutletContext() || {};
+  return <OverviewView onSelectVessel={ctx.onSelectVessel} />;
+}
+
+function MapRoute() {
+  const ctx = useOutletContext() || {};
+  return (
+    <GeospatialView
+      vessels={ctx.allVessels || []}
+      onSelectVessel={ctx.onSelectVessel}
+      selectedVessel={ctx.selectedVessel}
+      acoRoute={ctx.acoRoute}
+      onClearAcoRoute={ctx.onClearAcoRoute}
+    />
+  );
+}
+
+function VesselsRoute() {
+  const ctx = useOutletContext() || {};
+  return (
+    <FleetTableView
+      vessels={ctx.allVessels || []}
+      onSelectVessel={ctx.onSelectVessel}
+      onLocateOnMap={ctx.onLocateOnMap}
+      onViewInGraph={ctx.onViewInGraph}
+      onRunAcoFromVessel={ctx.onRunAcoFromVessel}
+    />
+  );
+}
+
+function VesselDetailParamRoute() {
+  const { mmsi } = useParams();
+  const ctx = useOutletContext() || {};
+
+  useEffect(() => {
+    if (mmsi && ctx.allVessels?.length > 0) {
+      const found = ctx.allVessels.find(v => v.mmsi === mmsi);
+      if (found) ctx.onSelectVessel(found);
+    }
+  }, [mmsi, ctx.allVessels, ctx.onSelectVessel]);
+
+  return <VesselsRoute />;
+}
+
+function RiskIntelligenceRoute() {
+  const ctx = useOutletContext() || {};
+  return <AnalyticsView onSelectVessel={ctx.onSelectVessel} />;
+}
+
+function AlertsRoute() {
+  const ctx = useOutletContext() || {};
+  return (
+    <InvestigationsView
+      vessels={ctx.allVessels || []}
+      onSelectVessel={ctx.onSelectVessel}
+      selectedVesselForCase={ctx.selectedVesselForCase}
+      onClearVesselForCase={ctx.onClearVesselForCase}
+    />
+  );
+}
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('map');
-  const [vessels, setVessels] = useState([]);
-  const [stats, setStats] = useState(null);
-  const [backendOnline, setBackendOnline] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  // Modal & Selection States
-  const [selectedVessel, setSelectedVessel] = useState(null);
-  const [preselectedOrigin, setPreselectedOrigin] = useState(null);
-  const [selectedVesselForCase, setSelectedVesselForCase] = useState(null);
-  const [acoRoute, setAcoRoute] = useState(null);
-
-  // Search & Banner
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showDisclaimer, setShowDisclaimer] = useState(true);
-
-  // Initial Data Ingestion & Health Polling
-  useEffect(() => {
-    async function loadData() {
-      const health = await checkBackendHealth();
-      setBackendOnline(health.online);
-
-      const [vesselsList, summary] = await Promise.all([
-        fetchVessels(),
-        fetchMetricsSummary(),
-      ]);
-
-      setVessels(vesselsList);
-      setStats(summary);
-      setLoading(false);
-    }
-
-    loadData();
-
-    // Periodic Health Check
-    const interval = setInterval(async () => {
-      const health = await checkBackendHealth();
-      setBackendOnline(health.online);
-    }, 15000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // Handlers for cross-component workflows
-  const handleLocateOnMap = (vessel) => {
-    setSelectedVessel(vessel);
-    setActiveTab('map');
-  };
-
-  const handleViewInGraph = (vessel) => {
-    setSelectedVessel(vessel);
-    setActiveTab('network');
-  };
-
-  const handleRunAcoFromVessel = (vessel) => {
-    setPreselectedOrigin(vessel);
-    setActiveTab('aco');
-    setSelectedVessel(null);
-  };
-
-  const handleProjectToMap = (result) => {
-    setAcoRoute(result);
-    setActiveTab('map');
-  };
-
-  const handleAddToCase = (vessel) => {
-    setSelectedVesselForCase(vessel);
-    setActiveTab('cases');
-    setSelectedVessel(null);
-  };
-
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden nautical-grid-bg text-text-primary">
-      
-      {/* 1. Global Tactical Header */}
-      <Header
-        stats={stats}
-        backendOnline={backendOnline}
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        onSelectVessel={setSelectedVessel}
-        allVessels={vessels}
-        onOpenDisclaimer={() => setShowDisclaimer(true)}
-        isLoading={loading}
-      />
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<AppLayout />}>
+          {/* 1. Page 1: Intelligence Overview */}
+          <Route index element={<OverviewRoute />} />
+          <Route path="overview" element={<OverviewRoute />} />
 
-      {/* 2. Mandatory Ethics & Evidentiary Standard Notice */}
-      <DisclaimerBanner
-        isOpen={showDisclaimer}
-        onClose={() => setShowDisclaimer(false)}
-      />
+          {/* 2. Page 2: Interactive Maritime Map */}
+          <Route path="map" element={<MapRoute />} />
 
-      {/* 3. Tactical Tab Navigation */}
-      <Navigation
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        caseCount={2}
-      />
+          {/* 3. Page 3: Vessel Explorer */}
+          <Route path="vessels" element={<VesselsRoute />} />
+          <Route path="vessels/:mmsi" element={<VesselDetailParamRoute />} />
 
-      {/* 4. Active Surveillance Views with Smooth Page Transition */}
-      <main className="flex-1 overflow-hidden relative">
-        {loading ? (
-          <div className="w-full h-full p-6 flex flex-col justify-center max-w-4xl mx-auto space-y-4 font-mono text-text-secondary">
-            <div className="flex items-center space-x-3 text-accent-cyan">
-              <span className="w-3 h-3 rounded-full bg-accent-cyan animate-ping" />
-              <span className="text-xs uppercase tracking-widest font-bold">
-                Synchronizing Maritime Signals & Graph Centralities...
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-              <div className="h-24 skeleton-shimmer" />
-              <div className="h-24 skeleton-shimmer" />
-              <div className="h-24 skeleton-shimmer" />
-              <div className="h-24 skeleton-shimmer" />
-            </div>
-            <div className="h-64 skeleton-shimmer" />
-          </div>
-        ) : (
-          <div key={activeTab} className="w-full h-full page-transition-enter">
-            {activeTab === 'map' && (
-              <GeospatialView
-                vessels={vessels}
-                onSelectVessel={setSelectedVessel}
-                selectedVessel={selectedVessel}
-                acoRoute={acoRoute}
-                onClearAcoRoute={() => setAcoRoute(null)}
-              />
-            )}
+          {/* 4. Page 4: Risk Intelligence */}
+          <Route path="risk-intelligence" element={<RiskIntelligenceRoute />} />
 
-            {activeTab === 'table' && (
-              <FleetTableView
-                vessels={vessels}
-                onSelectVessel={setSelectedVessel}
-                onLocateOnMap={handleLocateOnMap}
-                onViewInGraph={handleViewInGraph}
-                onRunAcoFromVessel={handleRunAcoFromVessel}
-              />
-            )}
+          {/* 5. Page 5: Network Analysis (SNA Graph + ACO Pathfinder) */}
+          <Route path="network" element={<NetworkAnalysisView />} />
 
-            {activeTab === 'network' && (
-              <NetworkView
-                onSelectVessel={setSelectedVessel}
-                selectedVessel={selectedVessel}
-                allVessels={vessels}
-              />
-            )}
+          {/* 6. Page 6: Alerts & Events (Investigation Cases) */}
+          <Route path="alerts" element={<AlertsRoute />} />
 
-            {activeTab === 'aco' && (
-              <AcoWorkbench
-                vessels={vessels}
-                onProjectToMap={handleProjectToMap}
-                onSelectVessel={setSelectedVessel}
-                preselectedOrigin={preselectedOrigin}
-              />
-            )}
+          {/* 7. Page 7: Research Methodology & Standards */}
+          <Route path="methodology" element={<MethodologyView />} />
 
-            {activeTab === 'analytics' && (
-              <AnalyticsView
-                onSelectVessel={setSelectedVessel}
-              />
-            )}
-
-            {activeTab === 'cases' && (
-              <InvestigationsView
-                vessels={vessels}
-                onSelectVessel={setSelectedVessel}
-                selectedVesselForCase={selectedVesselForCase}
-                onClearVesselForCase={() => setSelectedVesselForCase(null)}
-              />
-            )}
-          </div>
-        )}
-      </main>
-
-      {/* 5. Deep-Dive Vessel Intelligence Dossier Modal */}
-      {selectedVessel && (
-        <VesselDossierModal
-          vessel={selectedVessel}
-          onClose={() => setSelectedVessel(null)}
-          onLocateOnMap={handleLocateOnMap}
-          onViewInGraph={handleViewInGraph}
-          onRunAcoFromVessel={handleRunAcoFromVessel}
-          onAddToCase={handleAddToCase}
-        />
-      )}
-
-    </div>
+          {/* Catch-all redirect to Overview */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }

@@ -52,19 +52,50 @@ Maritime Intelligence Platform & Behavioral Social Network Analysis (SNA) Consol
 
 ---
 
-## Active / Next Unfinished Feature: Investigation Case Management & Executive Reporting
-- **Goal**: Complete the operational case management lifecycle in `InvestigationsView.jsx`:
-  1. Case status transitions (`OPEN_INVESTIGATION`, `IN_REVIEW`, `RESOLVED`, `ARCHIVED`) with real-time UI updates.
-  2. Analyst inline observation notes log (append timestamped notes directly to case files).
-  3. Executive Brief Report generation (both structured JSON dossier and clean formatted Markdown/Executive Brief export).
-  4. Search and status/priority filters on case files.
-- **Target Files**:
-  - `frontend/src/views/InvestigationsView.jsx`
-  - `frontend/src/services/alerts.js`
+### Section 6: Persistent Application Structure & Navigation
+- Implemented persistent layout with React Router (`AppLayout.jsx` with `<Outlet />`).
+- **Sidebar**: Brand `SHADOW FLEET AI` with small animated radar-style logo mark, 7 numbered surveillance modules (1 Overview, 2 Maritime Map, 3 Vessel Explorer, 4 Risk Intelligence, 5 Network Analysis, 6 Alerts & Events, 7 Research Methodology), and smooth collapsible behavior to icons with persisted state in `localStorage`.
+- **Top Bar**: Dynamic page title matching current route, global vessel search (debounced, MMSI/IMO/name matching, keyboard shortcut `/` and `Ctrl/Cmd+K`), data-source status (`API LIVE` / `DEMO ADAPTER`), live UTC clock with manual refresh, notification bell with unread count badge & popover, and profile menu (`Desk 03`) with the **"Reduce effects" toggle**.
+
+### Section 7: Page 1 — Intelligence Overview (`OverviewView.jsx`)
+- **6 KPI Cards** with easing count-up numbers (`CountingNumber`) and SVG sparklines (`Sparkline`):
+  1. Vessels monitored (navigates to `/vessels`)
+  2. Vessels with anomalies (navigates to `/vessels?tier=ANOMALOUS`)
+  3. High-priority reviews (navigates to `/vessels?tier=CRITICAL_MONITORING`)
+  4. Dark AIS gaps (navigates to `/map?layer=gaps`)
+  5. STS encounters (navigates to `/map?layer=encounters`)
+  6. Unresolved alerts (navigates to `/alerts`)
+- **Section A**: Embedded Leaflet mini-map preview with tactical vessel markers, hotspots, and animated conic radar sweep overlay (`RadarSweepOverlay.jsx`).
+- **Section B**: 30-day composite anomaly activity timeline area chart with gradient fills and date window filters (24H, 7D, 30D, ALL).
+- **Section C**: Fleet anomaly category distribution donut chart with center vessel count, interactive segment hover, and legend.
+- **Section D**: Sortable top-vessels-to-investigate table with mini score progress bars and row click opening deep-dive dossiers.
+- **Section E**: Recent maritime events feed with timestamps, severity badges, and slide-in evidence drawer.
+- **Section F**: Data coverage and ingestion freshness telemetry indicators with visible `DEMO DATA` badge when synthetic adapters are active.
+
+### Section 8: Page 2 — Interactive Maritime Map (`GeospatialView.jsx`)
+- Full-size Leaflet tactical map with CARTO Dark Matter basemap.
+- Directional vessel markers rotated to heading, color-coded by anomaly category (`#39D98A`, `#4285F4`, `#F5B942`, `#FF5C65`), with pulsing beacon halos for elevated/critical tiers.
+- Trajectory polylines with outer drop-shadow glow and animated comets.
+- AIS dark gap corridors with "Signal Lost" expanding ripple origin markers and duration.
+- Bilateral STS encounter connector lines with proximity circle and pulsing midpoint indicator.
+- Ports and anchorages layer with custom anchor glyphs.
+- Map controls: Zoom in/out, pan, reset view, and fit-to-data bounds.
+- Layer toggles, tactical legend, and time-range filters (24h, 48h, 7d, 30d).
+- Vessel search and filter panel: Vessel type, anomaly category, AIS-gap status, encounter status, flag state.
+- Interactive Trajectory Replay scrubber with play/pause, rewind, speed multiplier (1x, 5x, 20x), and marker dimming during blackout gaps.
+- Glass-style marker popup displaying vessel name, MMSI, IMO, type, speed, heading, anomaly score, and "Open Vessel Details" button, strictly labeled **"Last reported positions"**.
+
+### Section 9: Page 3 — Vessel Explorer (`FleetTableView.jsx`)
+- Debounced search by Name, MMSI, IMO, and Flag.
+- Modern table displaying: Vessel Identifier, MMSI, IMO, Type, Flag State, Last Position, Last AIS Update, Anomaly Score with mini progress bar, Detected Events badges (AIS gaps, STS, Spoofing, Loitering), Investigation Status, and quick triage action buttons.
+- Multi-column sorting (Score, Name, Flag, Gaps, MMSI, Type).
+- Pagination (10, 25, 50 rows per page with page numbers).
+- Multi-dimensional filters (Category tier, Flag, Type, AIS gaps, STS encounters) with "Clear Filters" button.
+- Loading shimmer skeletons, empty results state with reset, and error states.
+- Row click opens the comprehensive 43KB `VesselDossierModal.jsx` intelligence profile.
 
 ---
 
-## History of Changes
-- *2026-10-26*: Section 5 Graphics & Visual Effects layer completed and verified in browser.
-- *2026-10-26*: Fixed CSS `@import` ordering and comma-separated `@media` selector bug.
-- *2026-10-26*: Created `PROGRESS.md` tracking architecture, verification state, and next task.
+## Verification & Status
+- Both dev server and production build verified cleanly with 0 errors (`vite build` compiled in 2.19s).
+- Full browser subagent test recorded and verified across all pages.
