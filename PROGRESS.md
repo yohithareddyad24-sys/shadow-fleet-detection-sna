@@ -94,8 +94,45 @@ Maritime Intelligence Platform & Behavioral Social Network Analysis (SNA) Consol
 - Loading shimmer skeletons, empty results state with reset, and error states.
 - Row click opens the comprehensive 43KB `VesselDossierModal.jsx` intelligence profile.
 
+### Section 10: Page 5 — Network Analysis Upgrade (`NetworkView.jsx` & Modules)
+- **Interactive Graph (Cytoscape Built-ins)**:
+  - Simple graph and multigraph mode: parallel edges drawn as separate curved bezier curves (`control-point-step-size: 36`) with UI toggle.
+  - Zoom, pan, drag, reset layout, search filter, and relationship-type toggles (Ownership, STS Encounter, Repeated Interaction, Shared Registry, Unverified Proximity).
+  - Node click inspector with identity, risk tier, indicator evidence breakdown, and vessel profile trigger.
+  - Edge click inspector with relationship type, evidentiary basis, timestamps, and reporting source.
+  - 1-hop to 4-hop neighborhood slider isolating selected vessel subgraph and dimming unrelated entities.
+  - Step-by-step animated BFS and DFS traversals with play/pause/reset controls and ordered visit sequence panel.
+  - Strict evidentiary rules: unverified proximity edges rendered as dashed lines tagged "Unverified"; no inferred ownership from encounters or shared ports.
+- **5-Tier Risk Colors & Tactical Legend**:
+  - Low (Green `#10B981`), Medium (Yellow `#F59E0B`), High (Orange `#F97316`), Critical (Red `#EF4444`), Unknown/insufficient AIS data (Grey `#64748B`).
+  - Multi-channel visual encoding using symbols (`✓`, `●`, `▲`, `!`, `?`) alongside color.
+  - Node sizing driven dynamically by selected centrality metric.
+  - Mandatory compliance note: *"Colour shows analytical anomaly level, not confirmed illegal activity."*
+- **SNA Metrics HUD & Engine (`utils/graphMetrics.js`)**:
+  - Pure mathematical calculations for Total Nodes, Total Edges, Density, Connected Components, Average Degree, In-Degree, Out-Degree (directed), and Degree/Betweenness/Closeness centrality.
+  - Top-5 centrality ranking highlight cards and info-icon mathematical definitions.
+  - Unit-checked via `runGraphMetricsUnitCheck()` on a 4-node kite graph (9/9 assertions passed).
+- **AIS Indicator Evidence Classification**:
+  - Three evidence tiers: Observed facts, Algorithmic inferences, and Unverified observations.
+  - Alternative explanations note covering coverage gaps, equipment faults, weather, and legitimate operations.
+  - Mandatory standard warning: *"A single gap or STS is never presented as proof."*
+- **Dynamic In-Place Updates & Notifications**:
+  - In-place node addition, edge updates, and risk recoloring with animated highlights and event history log.
+  - Configurable live polling with clearly labeled DEMO simulation fallback.
+  - Notification drawer with severity filters (All, Critical, High, Medium, Low), mark read, clear, and toast alert dispatch.
+
 ---
 
 ## Verification & Status
-- Both dev server and production build verified cleanly with 0 errors (`vite build` compiled in 2.19s).
-- Full browser subagent test recorded and verified across all pages.
+- **Build Verification**: `npm run build` compiled cleanly (0 errors, 1.74s build time).
+- **Mathematical Verification**: `runGraphMetricsUnitCheck()` verified on small known graph:
+  - Nodes: 4, Edges: 4, Graph Density: 0.6667
+  - Node C highest betweenness centrality (0.6667)
+  - Degree map: A:2, B:2, C:3, D:1
+  - Directed In/Out degrees: A (in:1, out:1), B (in:1, out:1), C (in:1, out:2), D (in:1, out:0)
+  - BFS and DFS traversal order: ['A', 'B', 'C', 'D']
+- **Browser Verification**: Tested multigraph toggle, node selection and recoloring, evidence panel tabs, legend counts, and notification drawer.
+- **Status**:
+  - Done: Interactive Cytoscape multigraph/simple graph, 5-color risk legend, SNA metrics HUD, AIS evidence panel, BFS/DFS traversal engine, dynamic in-place updates, and notification drawer.
+  - Partial: Real-time backend streaming endpoint (FastAPI offline fallback with DEMO simulation active).
+  - Next: Hook into live WebSocket or SSE feed when production backend is operational.
