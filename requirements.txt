@@ -5,3 +5,9 @@ pandas>=2.0.0
 networkx>=3.0
 matplotlib>=3.7.0
 pytest>=7.0.0
+
+# Backend API and Database
+fastapi
+uvicorn
+sqlalchemy
+python-dotenv

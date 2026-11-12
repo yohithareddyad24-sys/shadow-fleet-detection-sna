@@ -63,54 +63,99 @@ def compute_composite_risk_scores(
     i_flag = df["flag_risk_weight"].clip(0.0, 1.0)
 
     # Min-max normalization for count indicators with safe denominator
-    max_gaps = df["ais_gap_count"].max()
-    norm_gaps = (df["ais_gap_count"] / max_gaps) if max_gaps > 0 else df["ais_gap_count"] * 0.0
+    max_gaps = df["ais_gap_count"].max() if "ais_gap_count" in df.columns else 0
+    norm_gaps = (df["ais_gap_count"] / max_gaps) if max_gaps > 0 else df.get("ais_gap_count", 0) * 0.0
 
-    max_spoofs = df["spoofing_incident_count"].max()
-    norm_spoofs = (df["spoofing_incident_count"] / max_spoofs) if max_spoofs > 0 else df["spoofing_incident_count"] * 0.0
+    max_spoofs = df["spoofing_incident_count"].max() if "spoofing_incident_count" in df.columns else 0
+    norm_spoofs = (df["spoofing_incident_count"] / max_spoofs) if max_spoofs > 0 else df.get("spoofing_incident_count", 0) * 0.0
+
+    # Optional encounter / idle contributions if configured in weights
+    norm_encounters = 0.0
+    if "weight_encounters" in normalized_weights and "encounter_count" in df.columns:
+        max_enc = df["encounter_count"].max()
+        norm_encounters = (df["encounter_count"] / max_enc) if max_enc > 0 else 0.0
 
     # Calculate individual weighted contributions
-    df["contrib_degree"] = round(c_deg * normalized_weights["weight_degree"], 4)
-    df["contrib_betweenness"] = round(c_bet * normalized_weights["weight_betweenness"], 4)
-    df["contrib_flag"] = round(i_flag * normalized_weights["weight_flag"], 4)
-    df["contrib_ais_gaps"] = round(norm_gaps * normalized_weights["weight_ais_gaps"], 4)
-    df["contrib_spoofing"] = round(norm_spoofs * normalized_weights["weight_spoofing"], 4)
+    df["contrib_degree"] = (c_deg * normalized_weights["weight_degree"]).round(4)
+    df["contrib_betweenness"] = (c_bet * normalized_weights["weight_betweenness"]).round(4)
+    df["contrib_flag"] = (i_flag * normalized_weights["weight_flag"]).round(4)
+    df["contrib_ais_gaps"] = (norm_gaps * normalized_weights["weight_ais_gaps"]).round(4)
+    df["contrib_spoofing"] = (norm_spoofs * normalized_weights["weight_spoofing"]).round(4)
 
-    # Total score bounded [0.0, 1.0]
     total_score = (
         df["contrib_degree"]
         + df["contrib_betweenness"]
         + df["contrib_flag"]
         + df["contrib_ais_gaps"]
         + df["contrib_spoofing"]
-    ).clip(0.0, 1.0)
+    )
 
-    df["composite_risk_score"] = round(total_score, 4)
+    if "weight_encounters" in normalized_weights:
+        df["contrib_encounters"] = (norm_encounters * normalized_weights["weight_encounters"]).round(4)
+        total_score += df["contrib_encounters"]
+
+    total_score = total_score.clip(0.0, 1.0)
+    df["composite_risk_score"] = total_score.round(4)
     df["risk_tier"] = df["composite_risk_score"].apply(categorize_risk_tiers)
 
     # Determine primary risk driver
     contrib_cols = {
         "High Degree Hub": "contrib_degree",
         "Intermediary Bridge (Betweenness)": "contrib_betweenness",
-        "Flag of Convenience": "contrib_flag",
-        "Dark AIS Gaps": "contrib_ais_gaps",
-        "Spoofing Discrepancy": "contrib_spoofing",
+        "Flag Risk Profile": "contrib_flag",
+        "AIS Transmission Gaps": "contrib_ais_gaps",
+        "Kinematic Spoofing / Jump": "contrib_spoofing",
     }
+    if "weight_encounters" in normalized_weights:
+        contrib_cols["Repeated Proximity Encounters"] = "contrib_encounters"
 
     def get_top_driver(row):
-        highest_label = "Baseline"
+        highest_label = "Baseline Activity"
         highest_val = -1.0
         for label, col in contrib_cols.items():
-            if row[col] > highest_val:
+            if col in row and row[col] > highest_val:
                 highest_val = row[col]
                 highest_label = label
         return highest_label
 
     df["primary_risk_driver"] = df.apply(get_top_driver, axis=1)
 
-    df.sort_values(by="composite_risk_score", ascending=False, inplace=True)
-    df.reset_index(drop=True, inplace=True)
+    df = df.sort_values(by="composite_risk_score", ascending=False).reset_index(drop=True)
     return df
+
+
+def explain_vessel_risk(vessel_row: pd.Series) -> List[str]:
+    """
+    Generate an explainable list of evidence sentences for a single vessel.
+    """
+    reasons: List[str] = []
+    score = float(vessel_row.get("composite_risk_score", 0.0))
+    tier = str(vessel_row.get("risk_tier", "BASELINE_LEGITIMATE"))
+
+    bet = float(vessel_row.get("betweenness_centrality", 0.0))
+    if bet >= 0.20:
+        reasons.append(f"High network betweenness ({bet:.2f}) indicates crucial bridge role in multi-hop interaction paths.")
+
+    deg = float(vessel_row.get("degree_centrality", 0.0))
+    if deg >= 0.25:
+        reasons.append(f"Elevated degree centrality ({deg:.2f}) indicates high-volume interaction hub.")
+
+    gaps = int(vessel_row.get("ais_gap_count", 0))
+    if gaps > 0:
+        reasons.append(f"Accumulated {gaps} observational AIS signal gap(s).")
+
+    spoofs = int(vessel_row.get("spoofing_incident_count", 0))
+    if spoofs > 0:
+        reasons.append(f"Flagged {spoofs} kinematic speed/position discontinuity incident(s).")
+
+    encs = int(vessel_row.get("encounter_count", 0))
+    if encs > 1:
+        reasons.append(f"Participated in {encs} bilateral proximity encounter(s).")
+
+    if not reasons:
+        reasons.append("Consistent with routine commercial navigation. No significant topological anomalies.")
+
+    return reasons
 
 
 def categorize_risk_tiers(score: float) -> str:

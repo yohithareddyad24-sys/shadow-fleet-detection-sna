@@ -162,7 +162,11 @@ def build_vessel_graph(
             "interaction_count": int(row.get("interaction_count", 1)),
             "avg_duration_hours": float(row.get("avg_duration_hours", 1.0)),
             "interaction_risk": float(row.get("interaction_risk", 0.5)),
-            "avg_distance_nm": float(row.get("avg_distance_nm", 0.5)),
+            "avg_distance_nm": float(row.get("avg_distance_nm", row.get("min_distance_nm", 0.5))),
+            "min_distance_nm": float(row.get("min_distance_nm", row.get("avg_distance_nm", 0.5))),
+            "first_encounter": str(row.get("first_encounter", "")),
+            "last_encounter": str(row.get("last_encounter", "")),
+            "supporting_evidence": str(row.get("supporting_evidence", "Operational bilateral encounter.")),
             "weight": weight_val,
         }
 
@@ -224,3 +228,227 @@ def get_graph_summary(G: Union[nx.Graph, nx.DiGraph]) -> Dict[str, Any]:
         "average_degree": round(avg_degree, 3),
         "is_directed": is_directed,
     }
+
+
+def add_or_update_vessel(G: Union[nx.Graph, nx.DiGraph], mmsi: str, **attrs) -> None:
+    """
+    Dynamically add or update an individual vessel node attributes in graph G.
+    Preserves existing attributes if not overridden.
+    """
+    node = str(mmsi).strip()
+    if G.has_node(node):
+        G.nodes[node].update(attrs)
+    else:
+        default_attrs = {
+            "mmsi": node,
+            "vessel_name": attrs.get("vessel_name", f"Vessel_{node}"),
+            "flag": attrs.get("flag", "UNKNOWN"),
+            "vessel_type": attrs.get("vessel_type", "UNKNOWN"),
+            "flag_risk_weight": attrs.get("flag_risk_weight", 0.0),
+            "ais_gap_count": attrs.get("ais_gap_count", 0),
+            "spoofing_incident_count": attrs.get("spoofing_incident_count", 0),
+        }
+        default_attrs.update(attrs)
+        G.add_node(node, **default_attrs)
+
+
+def record_interaction_event(
+    G: Union[nx.Graph, nx.DiGraph],
+    source_mmsi: str,
+    target_mmsi: str,
+    interaction_type: str = "POTENTIAL_STS_ENCOUNTER",
+    duration_hours: float = 1.0,
+    distance_nm: float = 0.5,
+    risk: float = 0.5,
+    timestamp: Optional[str] = None,
+    evidence: Optional[str] = None,
+) -> None:
+    """
+    Dynamically add or aggregate a new interaction event between two vessels.
+    Prevents self-loops, stubs missing nodes, and updates interaction metrics incrementally.
+    """
+    u = str(source_mmsi).strip()
+    v = str(target_mmsi).strip()
+    if u == v:
+        return
+
+    for node in (u, v):
+        if not G.has_node(node):
+            add_or_update_vessel(G, node)
+
+    if G.has_edge(u, v):
+        edge = G[u][v]
+        edge["interaction_count"] = edge.get("interaction_count", 1) + 1
+        edge["avg_duration_hours"] = round((edge.get("avg_duration_hours", duration_hours) + duration_hours) / 2.0, 2)
+        edge["min_distance_nm"] = min(edge.get("min_distance_nm", distance_nm), distance_nm)
+        edge["interaction_risk"] = max(edge.get("interaction_risk", risk), risk)
+        edge["weight"] = max(edge.get("weight", risk), risk)
+        if timestamp:
+            edge["last_encounter"] = timestamp
+        if evidence:
+            edge["supporting_evidence"] = evidence
+    else:
+        G.add_edge(
+            u,
+            v,
+            interaction_type=interaction_type,
+            interaction_count=1,
+            avg_duration_hours=float(duration_hours),
+            min_distance_nm=float(distance_nm),
+            interaction_risk=float(risk),
+            weight=float(risk),
+            first_encounter=timestamp or "",
+            last_encounter=timestamp or "",
+            supporting_evidence=evidence or f"Observed proximity of {distance_nm} nm for {duration_hours}h.",
+        )
+
+
+def build_vessel_multigraph(
+    vessels_df: pd.DataFrame,
+    encounters_df: pd.DataFrame,
+) -> nx.MultiGraph:
+    """
+    Construct a MultiGraph representation preserving separate historical encounter events.
+    """
+    MG = nx.MultiGraph()
+
+    for _, row in vessels_df.iterrows():
+        mmsi = str(row["mmsi"])
+        MG.add_node(mmsi, **row.to_dict())
+
+    for idx, row in encounters_df.iterrows():
+        u = str(row["source_mmsi"])
+        v = str(row["target_mmsi"])
+        if u == v:
+            continue
+        for node in (u, v):
+            if not MG.has_node(node):
+                MG.add_node(node, mmsi=node, vessel_name=f"Vessel_{node}")
+
+        edge_attrs = row.to_dict()
+        edge_attrs["key"] = f"event_{idx}_{u}_{v}"
+        MG.add_edge(u, v, **edge_attrs)
+
+    return MG
+
+
+def filter_graph_by_date_range(
+    G: Union[nx.Graph, nx.DiGraph, nx.MultiGraph],
+    start_time: str,
+    end_time: str,
+) -> Union[nx.Graph, nx.DiGraph]:
+    """
+    Generate a temporal subgraph view filtered to edges occurring within [start_time, end_time].
+    Does NOT modify the underlying historical master graph.
+    """
+    sub_G = G.__class__()
+    for node, attrs in G.nodes(data=True):
+        sub_G.add_node(node, **attrs)
+
+    for u, v, data in G.edges(data=True):
+        ts = data.get("first_encounter") or data.get("last_encounter") or data.get("encounter_timestamp")
+        if not ts:
+            sub_G.add_edge(u, v, **data)
+            continue
+        if start_time <= ts <= end_time:
+            sub_G.add_edge(u, v, **data)
+
+    return sub_G
+
+
+def export_graph_to_cytoscape(
+    G: Union[nx.Graph, nx.DiGraph],
+    risk_df: Optional[pd.DataFrame] = None,
+    community_map: Optional[Dict[str, int]] = None,
+    is_demo: bool = False,
+) -> Dict[str, Any]:
+    """
+    Serialize NetworkX graph to Cytoscape.js format matching React frontend expectations:
+    { "elements": [ { "data": { "id", "label", "riskScore", "riskCategory", ... } } ], "summary": { ... } }
+    """
+    elements: List[Dict[str, Any]] = []
+
+    risk_map: Dict[str, Dict[str, Any]] = {}
+    if risk_df is not None and not risk_df.empty:
+        for _, row in risk_df.iterrows():
+            m = str(row["mmsi"])
+            risk_map[m] = {
+                "riskScore": float(row.get("composite_risk_score", 0.1)),
+                "riskTier": str(row.get("risk_tier", "BASELINE_LEGITIMATE")),
+                "primaryDriver": str(row.get("primary_risk_driver", "Baseline")),
+            }
+
+    # 1. Nodes
+    for node, attrs in G.nodes(data=True):
+        mmsi = str(node)
+        r_info = risk_map.get(mmsi, {})
+        score = r_info.get("riskScore", float(attrs.get("risk_score", 0.1)))
+        tier = r_info.get("riskTier", attrs.get("risk_tier", "BASELINE_LEGITIMATE"))
+
+        # Map to 5 standard frontend categories
+        if tier == "CRITICAL_MONITORING" or score >= 0.65:
+            cat, sym, col = "CRITICAL", "!", "#FF5C65"
+        elif tier == "ELEVATED_ATTENTION" or score >= 0.45:
+            cat, sym, col = "HIGH", "▲", "#FF9900"
+        elif tier == "MODERATE_INTERACTION" or score >= 0.25:
+            cat, sym, col = "MEDIUM", "●", "#F5B942"
+        else:
+            cat, sym, col = "LOW", "✓", "#39D98A"
+
+        v_name = str(attrs.get("vessel_name", f"Vessel_{mmsi}"))
+        elements.append({
+            "data": {
+                "id": mmsi,
+                "label": v_name.replace("MOCK_", ""),
+                "fullName": v_name,
+                "flag": str(attrs.get("flag", "UNKNOWN")),
+                "vesselType": str(attrs.get("vessel_type", attrs.get("vessel_type_name", "Unknown"))),
+                "riskScore": round(score, 4),
+                "riskTier": tier,
+                "riskCategory": cat,
+                "riskSymbol": sym,
+                "riskColor": col,
+                "primaryDriver": r_info.get("primaryDriver", "Normal navigation"),
+                "betweenness": round(float(attrs.get("betweenness_centrality", 0.0)), 4),
+                "degree": round(float(attrs.get("degree_centrality", 0.0)), 4),
+                "closeness": round(float(attrs.get("closeness_centrality", 0.0)), 4),
+                "aisGaps": int(attrs.get("ais_gap_count", 0)),
+                "spoofingCount": int(attrs.get("spoofing_incident_count", 0)),
+                "community": community_map.get(mmsi, int(attrs.get("community_id", 1))) if community_map else 1,
+                "isDemo": is_demo,
+            }
+        })
+
+    # 2. Edges
+    edge_idx = 0
+    for u, v, data in G.edges(data=True):
+        edge_idx += 1
+        edge_id = f"edge-{u}-{v}-{edge_idx}"
+        i_type = str(data.get("interaction_type", "GENERIC_INTERACTION"))
+        elements.append({
+            "data": {
+                "id": edge_id,
+                "source": str(u),
+                "target": str(v),
+                "interactionType": i_type,
+                "label": i_type.replace("_", " "),
+                "count": int(data.get("interaction_count", 1)),
+                "duration": float(data.get("avg_duration_hours", 1.0)),
+                "risk": float(data.get("interaction_risk", data.get("weight", 0.5))),
+                "distance": float(data.get("min_distance_nm", data.get("avg_distance_nm", 0.5))),
+                "isVerified": True,
+                "evidence": str(data.get("supporting_evidence", "Operational bilateral encounter.")),
+                "timestamps": {
+                    "firstSeen": str(data.get("first_encounter", "2026-01-01")),
+                    "lastSeen": str(data.get("last_encounter", "2026-01-31")),
+                },
+                "sourceInfo": "NOAA AIS Vessel Tracks Ingestion",
+                "isDemo": is_demo,
+            }
+        })
+
+    return {
+        "elements": elements,
+        "summary": get_graph_summary(G),
+    }
+
